@@ -24,22 +24,26 @@ const deviceSchema = new mongoose.Schema({
   name: String,
   type: { type: String, enum: ['antena', 'router', 'server'], required: true },
   alive: Boolean,
+  parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Device', default: null }, // Relación con otro dispositivo
 });
 
 const Device = mongoose.model('Device', deviceSchema);
 
 // Rutas
+// Obtener dispositivos con la relación de dispositivos padres
 app.get('/devices', async (req, res) => {
   try {
-    const devices = await Device.find();
+    // Obtenemos los dispositivos y poblamos el campo 'parent' para que aparezca la información del dispositivo padre
+    const devices = await Device.find().populate('parent', 'ip name'); 
     res.json(devices);
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener dispositivos' });
   }
 });
 
+// Crear un dispositivo con un dispositivo padre
 app.post('/devices', async (req, res) => {
-  const { ip, name, type } = req.body;
+  const { ip, name, type, parent } = req.body;
 
   // Verificar si el dispositivo con la misma IP ya existe
   const existingDevice = await Device.findOne({ ip });
@@ -48,7 +52,14 @@ app.post('/devices', async (req, res) => {
   }
 
   // Crear y guardar el nuevo dispositivo
-  const device = new Device({ ip, name, type, alive: null });
+  const device = new Device({
+    ip,
+    name,
+    type,
+    alive: null,
+    parent: parent || null,  // Asignamos el dispositivo padre si se pasa
+  });
+
   try {
     await device.save();
     res.json(device);
@@ -57,6 +68,7 @@ app.post('/devices', async (req, res) => {
   }
 });
 
+// Eliminar un dispositivo por IP
 app.delete('/devices/:ip', async (req, res) => {
   const { ip } = req.params;
 
@@ -72,7 +84,6 @@ app.delete('/devices/:ip', async (req, res) => {
 app.post('/ping', async (req, res) => {
   const { devices } = req.body;
 
-  // Realizar ping real a cada dispositivo usando el paquete 'ping'
   const pingResults = await Promise.all(devices.map(async (ip) => {
     try {
       const { alive } = await ping.promise.probe(ip);
@@ -92,12 +103,11 @@ app.post('/ping', async (req, res) => {
   res.json(pingResults);
 });
 
-// Función para actualizar los estados de los dispositivos cada minuto
+// Función para actualizar el estado de los dispositivos cada minuto
 const updateDevicesStatus = async () => {
   const devices = await Device.find();
   const ips = devices.map(device => device.ip);
 
-  // Hacer ping a los dispositivos
   const pingResults = await Promise.all(ips.map(async (ip) => {
     try {
       const { alive } = await ping.promise.probe(ip);
