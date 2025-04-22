@@ -110,7 +110,7 @@ function App() {
         {devices.map((d) => (
           <li key={d.ip} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
             <img src={getDeviceImage(d.type)} alt={d.type} style={{ width: 30, height: 30, marginRight: 10 }} />
-            <span>{d.name || d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'}</span>
+            <span> {d.name} — {d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'}    </span>
             <button onClick={() => deleteDevice(d.ip)} style={{ marginLeft: 10 }}>❌ Eliminar</button>
           </li>
         ))}
