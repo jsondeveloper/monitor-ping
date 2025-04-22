@@ -8,18 +8,35 @@ function App() {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);  // Estado de carga
   const [message, setMessage] = useState('');  // Mensaje de error o éxito
+  const [activeTab, setActiveTab] = useState('');  // Estado para la pestaña activa
 
+  // Validación básica de IP
+  const isValidIP = (ip) => {
+    const regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return regex.test(ip);
+  };
+
+  // Llamar al backend para obtener dispositivos
   const fetchDevices = async () => {
+    setLoading(true); // Activar carga mientras obtenemos los dispositivos
     try {
       const res = await axios.get('http://localhost:3001/devices');
       setDevices(res.data);
       pingAll(res.data.map(d => d.ip));  // Hacer ping a todos los dispositivos
     } catch (err) {
       console.error('Error fetching devices:', err);
+    } finally {
+      setLoading(false); // Desactivar carga una vez que se obtienen los dispositivos
     }
   };
 
+  // Agregar un dispositivo
   const addDevice = async () => {
+    if (!isValidIP(ipInput)) {
+      setMessage('Por favor, ingresa una IP válida');
+      return;
+    }
+
     try {
       await axios.post('http://localhost:3001/devices', {
         ip: ipInput.trim(),
@@ -37,6 +54,7 @@ function App() {
     }
   };
 
+  // Eliminar un dispositivo
   const deleteDevice = async (ip) => {
     try {
       await axios.delete(`http://localhost:3001/devices/${ip}`);
@@ -46,6 +64,7 @@ function App() {
     }
   };
 
+  // Hacer ping a todos los dispositivos
   const pingAll = async (ips) => {
     setLoading(true);  // Activar el estado de carga mientras se hace el ping
     try {
@@ -63,6 +82,7 @@ function App() {
     }
   };
 
+  // Obtener imagen según el tipo de dispositivo
   const getDeviceImage = (type) => {
     const deviceImages = {
       router: '/images/router.png',
@@ -79,15 +99,37 @@ function App() {
     pingAll(ips);  // Llamar a la función pingAll
   };
 
+  // Agrupar los dispositivos por el segmento de IP
+  const groupDevicesBySegment = () => {
+    const groups = devices.reduce((acc, device) => {
+      const segment = device.ip.split('.').slice(0, 3).join('.');  // Obtener el segmento de IP
+      if (!acc[segment]) {
+        acc[segment] = [];
+      }
+      acc[segment].push(device);
+      return acc;
+    }, {});
+
+    return groups;
+  };
+
+  // Cambiar de pestaña
+  const handleTabChange = (segment) => {
+    setActiveTab(segment);
+  };
+
   useEffect(() => {
     fetchDevices();  // Llamar al inicio para obtener los dispositivos
-    const interval = setInterval(() => fetchDevices(), 20000);  // Actualizar cada 20 segundos
+    const interval = setInterval(() => fetchDevices(), 60000);  // Actualizar cada 60 segundos
     return () => clearInterval(interval);  // Limpiar intervalo al desmontar el componente
   }, []);
+
+  const deviceGroups = groupDevicesBySegment();
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Monitor de Dispositivos</h1>
+      
       <div style={{ marginBottom: 10 }}>
         <input
           value={ipInput}
@@ -109,15 +151,39 @@ function App() {
 
       {message && <p>{message}</p>}
 
-      <ul>
-        {devices.map((d) => (
-          <li key={d.ip} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-            <img src={getDeviceImage(d.type)} alt={d.type} style={{ width: 30, height: 30, marginRight: 10 }} />
-            <span> {d.name} — {d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'} </span>
-            <button onClick={() => deleteDevice(d.ip)} style={{ marginLeft: 10 }}>❌ Eliminar</button>
-          </li>
+      <div>
+        {/* Pestañas para cada segmento de IP */}
+        {Object.keys(deviceGroups).map(segment => (
+          <button
+            key={segment}
+            onClick={() => handleTabChange(segment)}
+            style={{
+              margin: 5,
+              padding: 10,
+              backgroundColor: activeTab === segment ? '#007bff' : '#ddd',
+              color: activeTab === segment ? '#fff' : '#000',
+              borderRadius: 5
+            }}
+          >
+            {segment}
+          </button>
         ))}
-      </ul>
+      </div>
+
+      {/* Mostrar dispositivos según la pestaña activa */}
+      <div>
+        {activeTab && deviceGroups[activeTab] && (
+          <ul>
+            {deviceGroups[activeTab].map((d) => (
+              <li key={d.ip} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                <img src={getDeviceImage(d.type)} alt={d.type} style={{ width: 30, height: 30, marginRight: 10 }} />
+                <span> {d.name} — {d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'} </span>
+                <button onClick={() => deleteDevice(d.ip)} style={{ marginLeft: 10 }}>❌ Eliminar</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {loading && <p>🕒 Actualizando estado de dispositivos...</p>}
 
