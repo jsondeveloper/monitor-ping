@@ -73,9 +73,15 @@ function App() {
     }
   };
 
+  // Función para manejar la actualización manual de dispositivos
+  const handleUpdateDevices = () => {
+    const ips = devices.map(d => d.ip);  // Obtener las IPs de todos los dispositivos
+    pingAll(ips);  // Llamar a la función pingAll
+  };
+
   useEffect(() => {
     fetchDevices();  // Llamar al inicio para obtener los dispositivos
-    const interval = setInterval(() => fetchDevices(), 60000);  // Actualizar cada 60 segundos
+    const interval = setInterval(() => fetchDevices(), 20000);  // Actualizar cada 20 segundos
     return () => clearInterval(interval);  // Limpiar intervalo al desmontar el componente
   }, []);
 
@@ -104,12 +110,17 @@ function App() {
         {devices.map((d) => (
           <li key={d.ip} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
             <img src={getDeviceImage(d.type)} alt={d.type} style={{ width: 30, height: 30, marginRight: 10 }} />
-            <span> {d.name} — {d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'}  </span>
+            <span>{d.name || d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'}</span>
             <button onClick={() => deleteDevice(d.ip)} style={{ marginLeft: 10 }}>❌ Eliminar</button>
           </li>
         ))}
       </ul>
       {loading && <p>🕒 Actualizando estado de dispositivos...</p>}
+
+      {/* Botón para actualizar manualmente los dispositivos */}
+      <button onClick={handleUpdateDevices} style={{ marginTop: '20px' }}>
+        🟢 Actualizar ahora
+      </button>
     </div>
   );
 }
