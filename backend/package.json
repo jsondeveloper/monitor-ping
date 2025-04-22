@@ -1,0 +1,15 @@
+{
+  "name": "monitor-ping-backend",
+  "version": "1.0.0",
+  "dependencies": {
+    "axios": "^0.24.0",
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "mongoose": "^5.10.9",
+    "ping": "^0.4.4"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
