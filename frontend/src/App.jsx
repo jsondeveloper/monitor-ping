@@ -7,6 +7,7 @@ function App() {
   const [typeInput, setTypeInput] = useState('router');
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);  // Estado de carga
+  const [message, setMessage] = useState('');  // Mensaje de error o éxito
 
   const fetchDevices = async () => {
     try {
@@ -25,11 +26,13 @@ function App() {
         name: nameInput.trim(),
         type: typeInput
       });
+      setMessage('Dispositivo agregado con éxito!');
       setIpInput('');
       setNameInput('');
       setTypeInput('router');
       fetchDevices();  // Volver a obtener la lista de dispositivos
     } catch (err) {
+      setMessage('Error al agregar dispositivo.');
       console.error('Error adding device:', err);
     }
   };
@@ -61,16 +64,13 @@ function App() {
   };
 
   const getDeviceImage = (type) => {
-    switch (type) {
-      case 'router':
-        return '/images/router.png';
-      case 'antena':
-        return '/images/antena.png';
-      case 'server':
-        return '/images/server.png';
-      default:
-        return '/images/default.png';
-    }
+    const deviceImages = {
+      router: '/images/router.png',
+      antena: '/images/antena.png',
+      server: '/images/server.png',
+      default: '/images/default.png',
+    };
+    return deviceImages[type] || deviceImages.default;
   };
 
   // Función para manejar la actualización manual de dispositivos
@@ -106,21 +106,23 @@ function App() {
         </select>
         <button onClick={addDevice}>Agregar</button>
       </div>
+
+      {message && <p>{message}</p>}
+
       <ul>
         {devices.map((d) => (
           <li key={d.ip} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
             <img src={getDeviceImage(d.type)} alt={d.type} style={{ width: 30, height: 30, marginRight: 10 }} />
-            <span> {d.name} — {d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'}    </span>
+            <span> {d.name} — {d.ip} — {d.alive == null ? '⏳' : d.alive ? '🟢 Activo' : '🔴 Inactivo'} </span>
             <button onClick={() => deleteDevice(d.ip)} style={{ marginLeft: 10 }}>❌ Eliminar</button>
           </li>
         ))}
       </ul>
+
       {loading && <p>🕒 Actualizando estado de dispositivos...</p>}
 
       {/* Botón para actualizar manualmente los dispositivos */}
-      <button onClick={handleUpdateDevices} style={{ marginTop: '20px' }}>
-        🟢 Actualizar ahora
-      </button>
+      <button onClick={handleUpdateDevices}>Actualizar Todos</button>
     </div>
   );
 }
