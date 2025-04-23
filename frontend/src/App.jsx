@@ -119,7 +119,6 @@ function App() {
     setActiveTab(segment);
   };
 
-  // Mostrar jerarquía de dispositivos
   const DeviceTree = ({ devices, parentId = null, isRoot = true }) => {
     const children = devices.filter((device) => {
       const deviceParentId = device.parent?._id || null;
@@ -138,10 +137,8 @@ function App() {
           flexWrap: 'wrap',
         }}
       >
-        {/* Horizontal para hijos si hay más de uno */}
         {children.length > 1 && (
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-            {/* Línea horizontal que conecta a todos los hijos */}
             <div
               style={{
                 position: 'absolute',
@@ -157,11 +154,7 @@ function App() {
             {children.map((device) => {
               const hasChildren = devices.some((d) => (d.parent?._id || null) === device._id);
               return (
-                <div key={device._id} style={{ margin: '0 20px', textAlign: 'center', position: 'relative',  backgroundColor: '#fff', 
-                  borderRadius: 6,
-                  zIndex: 0,
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',}}>
-                  {/* Línea vertical que baja desde horizontal */}
+                <div key={device._id} style={{ margin: '0 20px', textAlign: 'center', position: 'relative', backgroundColor: '#fff', borderRadius: 6, zIndex: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                   <div
                     style={{
                       position: 'absolute',
@@ -174,9 +167,7 @@ function App() {
                       zIndex: -100,
                     }}
                   />
-                  {/* Nodo */}
                   <DeviceNode device={device} />
-                  {/* Render hijos */}
                   {hasChildren && (
                     <div style={{ marginTop: 20 }}>
                       <DeviceTree devices={devices} parentId={device._id} isRoot={false} />
@@ -188,13 +179,11 @@ function App() {
           </div>
         )}
 
-        {/* Caso: solo un hijo → mostrar vertical directo */}
         {children.length === 1 && (() => {
           const device = children[0];
           const hasChildren = devices.some((d) => (d.parent?._id || null) === device._id);
           return (
             <div style={{ textAlign: 'center', position: 'relative' }}>
-              {/* Línea vertical desde el padre */}
               {!isRoot && (
                 <div
                   style={{
@@ -209,9 +198,7 @@ function App() {
                   }}
                 />
               )}
-              {/* Nodo */}
               <DeviceNode device={device} />
-              {/* Hijos */}
               {hasChildren && (
                 <div style={{ marginTop: 20 }}>
                   <DeviceTree devices={devices} parentId={device._id} isRoot={false} />
@@ -224,9 +211,8 @@ function App() {
     );
   };
 
-  // Extraído para claridad
   const DeviceNode = ({ device }) => {
-    const backgroundColor = device.alive ? '#e0fbe0' : '#fde0e0'; // Verde claro si alive, rojo claro si no
+    const backgroundColor = device.alive ? '#e0fbe0' : '#fde0e0';
 
     return (
       <div
@@ -261,25 +247,15 @@ function App() {
   }, []);
 
   const deviceGroups = groupDevicesBySegment();
-  const filteredDevices = activeTab
-    ? devices.filter((d) => d.ip.startsWith(activeTab))
-    : devices;
+  const filteredDevices = activeTab ? devices.filter((d) => d.ip.startsWith(activeTab)) : devices;
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, position: 'relative' }}>
       <h1>Monitor de Dispositivos</h1>
 
       <div style={{ marginBottom: 10 }}>
-        <input
-          value={ipInput}
-          onChange={(e) => setIpInput(e.target.value)}
-          placeholder="IP"
-        />
-        <input
-          value={nameInput}
-          onChange={(e) => setNameInput(e.target.value)}
-          placeholder="Nombre"
-        />
+        <input value={ipInput} onChange={(e) => setIpInput(e.target.value)} placeholder="IP" />
+        <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder="Nombre" />
         <select value={typeInput} onChange={(e) => setTypeInput(e.target.value)}>
           <option value="router">Router</option>
           <option value="antena">Antena</option>
@@ -295,40 +271,53 @@ function App() {
         </select>
         <button onClick={addDevice}>Agregar Dispositivo</button>
         <button onClick={handleUpdateDevices}>Actualizar Estado</button>
-    
       </div>
 
-      <div style={{ marginBottom: 10 }}>{message && <p>{message}</p>}</div>
+      {message && <p>{message}</p>}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 20 }}>
         {Object.keys(deviceGroups).map((segment) => (
-          <div
-            key={segment}
-            onClick={() => handleTabChange(segment)}
-            style={{
-              margin: '0 10px',
-              padding: '5px 10px',
-              cursor: 'pointer',
-              borderRadius: '5px',
-              backgroundColor: activeTab === segment ? '#4CAF50' : '#ddd',
-              color: activeTab === segment ? '#fff' : '#000',
-            }}
-          >
+          <div key={segment} onClick={() => handleTabChange(segment)} style={{ margin: '0 10px', padding: '5px 10px', cursor: 'pointer', borderRadius: '5px', backgroundColor: activeTab === segment ? '#ccc' : '#eee' }}>
             {segment}
           </div>
         ))}
       </div>
 
-      <div>
-        {loading ? (
-          <div>Cargando...</div>
-          
-        ) : (
-          <DeviceTree devices={filteredDevices} />
-        )}
-      </div>
+      <DeviceTree devices={filteredDevices} />
+
+      {loading && <LoadingOverlay />}
     </div>
   );
 }
+
+// Componente del overlay con spinner
+const LoadingOverlay = () => (
+  <div style={{
+    position: 'fixed',
+    top: 0, left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 9999,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center'
+  }}>
+    <div style={{
+      width: 50,
+      height: 50,
+      border: '6px solid #f3f3f3',
+      borderTop: '6px solid #3498db',
+      borderRadius: '50%',
+      animation: 'spin 1s linear infinite'
+    }} />
+    <style>
+      {`@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }`}
+    </style>
+  </div>
+);
 
 export default App;
