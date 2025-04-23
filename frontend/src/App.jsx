@@ -204,16 +204,15 @@ function App() {
         <img
           src={getDeviceImage(device.type)}
           alt={device.type}
-          style={{ width: 20, height: 20 }}
+          style={{ width: 20, height: 20, marginRight: 5 }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
           <span>
             -| <strong>{device.name || 'Sin nombre'}</strong> | {device.ip}
             {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢 (${device.method})` : `🔴 (${device.method})`}
-
           </span>
         </div>
-        <button onClick={() => deleteDevice(device.ip)}>Eliminar</button>
+        <button onClick={() => deleteDevice(device.ip)} style={{ marginLeft: 10 }}>Eliminar</button>
       </div>
     );
   };
@@ -230,19 +229,28 @@ function App() {
     : devices;
 
   return (
-    <div style={{ padding: 20, position: 'relative' }}>
-      <h1>Monitor de Dispositivos</h1>
+    <div style={{ padding: 20, position: 'relative', fontFamily: 'Arial, sans-serif' }}>
+      <h1 style={{ textAlign: 'center', marginBottom: 20 }}>Monitor de Dispositivos</h1>
 
-      <div style={{ marginBottom: 10 }}>
-        <input value={ipInput} onChange={(e) => setIpInput(e.target.value)} placeholder="IP" />
-        <input value={portInput} onChange={(e) => setPortInput(e.target.value)} placeholder="Puerto (opcional)" />
-        <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder="Nombre" />
-        <select value={typeInput} onChange={(e) => setTypeInput(e.target.value)}>
+      <div
+        style={{
+          marginBottom: 20,
+          display: 'flex',
+          gap: 10,
+          justifyContent: 'center',
+        }}
+      >
+        <select value={typeInput} onChange={(e) => setTypeInput(e.target.value)} style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }}>
           <option value="router">Router</option>
           <option value="antena">Antena</option>
           <option value="server">Servidor</option>
         </select>
-        <select value={parentInput} onChange={(e) => setParentInput(e.target.value)}>
+        <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder="Nombre" style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+
+        <input value={ipInput} onChange={(e) => setIpInput(e.target.value)} placeholder="IP" style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+        <input value={portInput} onChange={(e) => setPortInput(e.target.value)} placeholder="Puerto (opcional)" style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
+
+        <select value={parentInput} onChange={(e) => setParentInput(e.target.value)} style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }}>
           <option value="">Dispositivo Padre (opcional)</option>
           {devices.map((device) => (
             <option key={device._id} value={device._id}>
@@ -250,34 +258,56 @@ function App() {
             </option>
           ))}
         </select>
-        <button onClick={addDevice}>Agregar Dispositivo</button>
-        <button onClick={handleUpdateDevices}>Actualizar Estado</button>
+        <button onClick={addDevice} style={{ padding: 10, borderRadius: 6, backgroundColor: '#4CAF50', cursor: 'pointer', color: '#fff', border: 'none' }}>Agregar Dispositivo</button>
+
       </div>
 
-      {message && <p>{message}</p>}
+      {message && <p style={{ textAlign: 'center', color: '#333' }}>{message}</p>}
 
       <div
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          margin: 20,
+          gap: '10px',
           justifyContent: 'center',
+          marginBottom: 20,
         }}
       >
+        <button
+          onClick={() => setActiveTab('')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            backgroundColor: activeTab === '' ? '#4CAF50' : '#f0f0f0',
+            color: activeTab === '' ? '#fff' : '#333',
+            border: '1px solid #ccc',
+            cursor: 'pointer',
+            fontWeight: activeTab === '' ? 'bold' : 'normal',
+          }}
+        >
+          Todos
+        </button>
+
         {Object.keys(deviceGroups).map((segment) => (
-          <div
+          <button
             key={segment}
             onClick={() => handleTabChange(segment)}
             style={{
-              margin: '0 10px',
-              padding: '5px 10px',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              backgroundColor: activeTab === segment ? '#4CAF50' : '#f0f0f0',
+              color: activeTab === segment ? '#fff' : '#333',
+              border: '1px solid #ccc',
               cursor: 'pointer',
-              backgroundColor: activeTab === segment ? '#ccc' : '#eee',
+              fontWeight: activeTab === segment ? 'bold' : 'normal',
             }}
           >
-            {segment}
-          </div>
+            {segment}.x
+          </button>
         ))}
+
+
+        <button onClick={handleUpdateDevices} style={{ padding: 10, borderRadius: 6, cursor: 'pointer', backgroundColor: '#2196F3', color: '#fff', border: 'none' }}>Actualizar Estado</button>
       </div>
 
       <DeviceTree devices={filteredDevices} />
@@ -295,7 +325,7 @@ const LoadingOverlay = () => (
       left: 0,
       width: '100%',
       height: '100%',
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(255, 255, 255, 0.7)',
       zIndex: 9999,
       display: 'flex',
       justifyContent: 'center',
