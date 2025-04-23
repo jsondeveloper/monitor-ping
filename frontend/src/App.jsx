@@ -233,12 +233,12 @@ function App() {
       <h1 style={{ textAlign: 'center', marginBottom: 20 }}>Monitor de Dispositivos</h1>
 
       <div
-        style={{
-          marginBottom: 20,
-          display: 'flex',
-          gap: 10,
-          justifyContent: 'center',
-        }}
+       style={{
+        marginBottom: 20,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 10,
+      }}
       >
         <select value={typeInput} onChange={(e) => setTypeInput(e.target.value)} style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }}>
           <option value="router">Router</option>
