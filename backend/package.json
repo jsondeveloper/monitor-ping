@@ -7,7 +7,8 @@
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "mongoose": "^5.10.9",
-    "ping": "^0.4.4"
+    "ping": "^0.4.4",
+    "tcp-ping": "^0.1.1"
   },
   "scripts": {
     "start": "node server.js"

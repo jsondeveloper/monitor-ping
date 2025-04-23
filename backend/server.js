@@ -1,9 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const ping = require('ping');
+const tcpp = require('tcp-ping');
+const ping = require('ping'); // ICMP
 
-// Configuración de Express
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -23,41 +23,56 @@ const deviceSchema = new mongoose.Schema({
   ip: { type: String, required: true, unique: true },
   name: String,
   type: { type: String, enum: ['antena', 'router', 'server'], required: true },
+  port: { type: Number, default: 80 },
   alive: Boolean,
-  parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Device', default: null }, // Relación con otro dispositivo
+  method: { type: String, enum: ['TCP', 'ICMP'], default: 'TCP' },
+  parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Device', default: null },
+}, {
+  versionKey: false // Esto deshabilita el campo `__v`
 });
 
 const Device = mongoose.model('Device', deviceSchema);
 
+// Función combinada TCP + ICMP
+async function pingDevice(ip, port = 80) {
+  return new Promise((resolve) => {
+    tcpp.probe(ip, port, async (err, aliveTCP) => {
+      if (err || !aliveTCP) {
+        // Si TCP falla, prueba con ICMP
+        const res = await ping.promise.probe(ip);
+        resolve({ ip, port, alive: res.alive, method: 'ICMP' });
+      } else {
+        resolve({ ip, port, alive: true, method: 'TCP' });
+      }
+    });
+  });
+}
+
 // Rutas
-// Obtener dispositivos con la relación de dispositivos padres
 app.get('/devices', async (req, res) => {
   try {
-    // Obtenemos los dispositivos y poblamos el campo 'parent' para que aparezca la información del dispositivo padre
-    const devices = await Device.find().populate('parent', 'ip name'); 
+    const devices = await Device.find().populate('parent', 'ip name');
     res.json(devices);
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener dispositivos' });
   }
 });
 
-// Crear un dispositivo con un dispositivo padre
 app.post('/devices', async (req, res) => {
-  const { ip, name, type, parent } = req.body;
+  const { ip, name, type, port = 80, parent } = req.body;
 
-  // Verificar si el dispositivo con la misma IP ya existe
   const existingDevice = await Device.findOne({ ip });
   if (existingDevice) {
     return res.status(400).json({ error: 'Dispositivo con esta IP ya existe' });
   }
 
-  // Crear y guardar el nuevo dispositivo
   const device = new Device({
     ip,
     name,
     type,
+    port,
     alive: null,
-    parent: parent || null,  // Asignamos el dispositivo padre si se pasa
+    parent: parent || null,
   });
 
   try {
@@ -68,7 +83,6 @@ app.post('/devices', async (req, res) => {
   }
 });
 
-// Eliminar un dispositivo por IP
 app.delete('/devices/:ip', async (req, res) => {
   const { ip } = req.params;
 
@@ -80,55 +94,40 @@ app.delete('/devices/:ip', async (req, res) => {
   }
 });
 
-// Ruta para hacer ping a los dispositivos de forma real
+// Ruta para hacer ping desde el frontend
 app.post('/ping', async (req, res) => {
   const { devices } = req.body;
 
   const pingResults = await Promise.all(devices.map(async (ip) => {
-    try {
-      const { alive } = await ping.promise.probe(ip);
-      return { ip, alive };
-    } catch (err) {
-      console.error('Error al hacer ping a', ip, err);
-      return { ip, alive: false }; // Si ocurre un error, marcar como inactivo
-    }
+    const device = await Device.findOne({ ip });
+    if (!device) return { ip, alive: false };
+
+    return await pingDevice(ip, device.port || 80);
   }));
 
-  // Actualizar el estado de cada dispositivo
-  for (let i = 0; i < pingResults.length; i++) {
-    const result = pingResults[i];
-    await Device.updateOne({ ip: result.ip }, { alive: result.alive });
+  for (let result of pingResults) {
+    await Device.updateOne({ ip: result.ip }, { alive: result.alive, method: result.method });
   }
 
   res.json(pingResults);
 });
 
-// Función para actualizar el estado de los dispositivos cada minuto
+// Actualización automática cada minuto
 const updateDevicesStatus = async () => {
   const devices = await Device.find();
-  const ips = devices.map(device => device.ip);
 
-  const pingResults = await Promise.all(ips.map(async (ip) => {
-    try {
-      const { alive } = await ping.promise.probe(ip);
-      return { ip, alive };
-    } catch (err) {
-      console.error('Error al hacer ping a', ip, err);
-      return { ip, alive: false }; // Si ocurre un error, marcar como inactivo
-    }
+  const pingResults = await Promise.all(devices.map(device => {
+    return pingDevice(device.ip, device.port || 80);
   }));
 
-  // Actualizar el estado de cada dispositivo en la base de datos
-  for (let i = 0; i < pingResults.length; i++) {
-    const result = pingResults[i];
-    await Device.updateOne({ ip: result.ip }, { alive: result.alive });
+  for (let result of pingResults) {
+    await Device.updateOne({ ip: result.ip }, { alive: result.alive, method: result.method });
   }
 
   console.log('Dispositivos actualizados');
 };
 
-// Iniciar el intervalo para actualizar los dispositivos cada minuto
-setInterval(updateDevicesStatus, 60000); // 60000 ms = 1 minuto
+setInterval(updateDevicesStatus, 60000);
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3001;

@@ -3,6 +3,7 @@ import axios from 'axios';
 
 function App() {
   const [ipInput, setIpInput] = useState('');
+  const [portInput, setPortInput] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [typeInput, setTypeInput] = useState('router');
   const [parentInput, setParentInput] = useState('');
@@ -39,11 +40,13 @@ function App() {
     try {
       await axios.post('http://localhost:3001/devices', {
         ip: ipInput,
+        port: portInput || '80',
         name: nameInput,
         type: typeInput,
         parent: parentInput || null,
       });
       setIpInput('');
+      setPortInput('');
       setNameInput('');
       setTypeInput('router');
       setParentInput('');
@@ -131,82 +134,52 @@ function App() {
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          flexDirection: isRoot ? 'row' : 'column',
+          alignItems: isRoot ? 'top' : 'flex-start',
           position: 'relative',
           flexWrap: 'wrap',
+          justifyContent: 'center',
+          marginLeft: isRoot ? 0 : 0,
+          borderLeft: isRoot ? 'none' : '2px solid #ccc',
+          paddingLeft: isRoot ? 0 : 20,
+          width: '100%',
         }}
       >
-        {children.length > 1 && (
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-            <div
-              style={{
-                position: 'absolute',
-                top: -10,
-                left: 0,
-                right: 0,
-                height: 2,
-                backgroundColor: '#ccc',
-                zIndex: -100,
-              }}
-            />
-
-            {children.map((device) => {
-              const hasChildren = devices.some((d) => (d.parent?._id || null) === device._id);
-              return (
-                <div key={device._id} style={{ margin: '0 20px', textAlign: 'center', position: 'relative', backgroundColor: '#fff', borderRadius: 6, zIndex: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: -10,
-                      left: '50%',
-                      width: 2,
-                      height: 20,
-                      backgroundColor: '#ccc',
-                      transform: 'translateX(-50%)',
-                      zIndex: -100,
-                    }}
-                  />
-                  <DeviceNode device={device} />
-                  {hasChildren && (
-                    <div style={{ marginTop: 20 }}>
-                      <DeviceTree devices={devices} parentId={device._id} isRoot={false} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {children.length === 1 && (() => {
-          const device = children[0];
+        {children.map((device) => {
           const hasChildren = devices.some((d) => (d.parent?._id || null) === device._id);
           return (
-            <div style={{ textAlign: 'center', position: 'relative' }}>
+            <div
+              key={device._id}
+              style={{
+                margin: isRoot ? '10px' : '10px 0',
+                textAlign: 'left',
+                position: 'relative',
+                backgroundColor: isRoot ? '#fff' : 'transparent',
+                boxShadow: isRoot ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                padding: isRoot ? 10 : 0,
+              }}
+            >
               {!isRoot && (
                 <div
                   style={{
                     position: 'absolute',
-                    top: -30,
-                    left: '50%',
-                    width: 2,
-                    height: 30,
+                    top: -10,
+                    left: -20,
+                    width: 20,
+                    height: 2,
                     backgroundColor: '#ccc',
-                    transform: 'translateX(-50%)',
-                    zIndex: -100,
                   }}
                 />
               )}
               <DeviceNode device={device} />
               {hasChildren && (
-                <div style={{ marginTop: 20 }}>
+                <div style={{ marginTop: 10 }}>
                   <DeviceTree devices={devices} parentId={device._id} isRoot={false} />
                 </div>
               )}
             </div>
           );
-        })()}
+        })}
       </div>
     );
   };
@@ -218,24 +191,29 @@ function App() {
       <div
         style={{
           display: 'inline-flex',
-          flexDirection: 'column',
+          flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'space-around',
           border: '1px solid #ddd',
-          borderRadius: 6,
-          padding: 10,
+          padding: 5,
           backgroundColor,
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          minWidth: 120,
+          fontSize: '0.9em',
         }}
       >
-        <img src={getDeviceImage(device.type)} alt={device.type} style={{ width: 32, height: 32, marginBottom: 5 }} />
-        <div>
-          <strong>{device.name || 'Sin nombre'}</strong><br />
-          {device.ip} {device.alive ? '🟢' : '🔴'}
+        <img
+          src={getDeviceImage(device.type)}
+          alt={device.type}
+          style={{ width: 20, height: 20 }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+          <span>
+            -| <strong>{device.name || 'Sin nombre'}</strong> | {device.ip}
+            {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢 (${device.method})` : `🔴 (${device.method})`}
+
+          </span>
         </div>
-        <button onClick={() => deleteDevice(device.ip)} style={{ marginTop: 5 }}>
-          Eliminar
-        </button>
+        <button onClick={() => deleteDevice(device.ip)}>Eliminar</button>
       </div>
     );
   };
@@ -247,7 +225,9 @@ function App() {
   }, []);
 
   const deviceGroups = groupDevicesBySegment();
-  const filteredDevices = activeTab ? devices.filter((d) => d.ip.startsWith(activeTab)) : devices;
+  const filteredDevices = activeTab
+    ? devices.filter((d) => d.ip.startsWith(activeTab))
+    : devices;
 
   return (
     <div style={{ padding: 20, position: 'relative' }}>
@@ -255,6 +235,7 @@ function App() {
 
       <div style={{ marginBottom: 10 }}>
         <input value={ipInput} onChange={(e) => setIpInput(e.target.value)} placeholder="IP" />
+        <input value={portInput} onChange={(e) => setPortInput(e.target.value)} placeholder="Puerto (opcional)" />
         <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder="Nombre" />
         <select value={typeInput} onChange={(e) => setTypeInput(e.target.value)}>
           <option value="router">Router</option>
@@ -275,9 +256,25 @@ function App() {
 
       {message && <p>{message}</p>}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 20 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          margin: 20,
+          justifyContent: 'center',
+        }}
+      >
         {Object.keys(deviceGroups).map((segment) => (
-          <div key={segment} onClick={() => handleTabChange(segment)} style={{ margin: '0 10px', padding: '5px 10px', cursor: 'pointer', borderRadius: '5px', backgroundColor: activeTab === segment ? '#ccc' : '#eee' }}>
+          <div
+            key={segment}
+            onClick={() => handleTabChange(segment)}
+            style={{
+              margin: '0 10px',
+              padding: '5px 10px',
+              cursor: 'pointer',
+              backgroundColor: activeTab === segment ? '#ccc' : '#eee',
+            }}
+          >
             {segment}
           </div>
         ))}
@@ -290,27 +287,31 @@ function App() {
   );
 }
 
-// Componente del overlay con spinner
 const LoadingOverlay = () => (
-  <div style={{
-    position: 'fixed',
-    top: 0, left: 0,
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 9999,
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center'
-  }}>
-    <div style={{
-      width: 50,
-      height: 50,
-      border: '6px solid #f3f3f3',
-      borderTop: '6px solid #3498db',
-      borderRadius: '50%',
-      animation: 'spin 1s linear infinite'
-    }} />
+  <div
+    style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      zIndex: 9999,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    <div
+      style={{
+        width: 50,
+        height: 50,
+        border: '6px solid #f3f3f3',
+        borderTop: '6px solid #3498db',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+      }}
+    />
     <style>
       {`@keyframes spin {
         0% { transform: rotate(0deg); }
