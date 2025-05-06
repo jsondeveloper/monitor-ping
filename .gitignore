@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+
+# Build output
+dist/
+build/
+
+# Editor config files
+.vscode/
+.idea/
+
+# Optional: evitar que suban los archivos de pruebas locales
+coverage/
