@@ -21,7 +21,112 @@ li::before {
   background: #ccc;
 }
 
+button{
+  cursor: pointer;
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+.dashboard-container {
+  display: grid;
+  grid-template-areas:
+    "logo user"
+    "stats stats";
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0.5em;
+  background-color: #333;
+  box-shadow: 0px 0px 10px #000;
+  align-items: center;
+}
+
+.logo {
+  grid-area: logo;
+  text-align: left;
+  
+}
+.logo img{
+  height: 2.5em;
+}
+.user {
+  grid-area: user;
+  text-align: right;
+}
+
+.stats-wrapper {
+  grid-area: stats;
+  display: flex;
+  justify-content: space-around;
+  gap: 0.8em;
+  flex-wrap: wrap;
+}
+
+.stat {
+  text-align: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2em 0.5em;
+  border-radius: 5px;
+  width: 5em;
+  text-align: center;
+}
+.badge p {
+  margin: 0;
+  font-size: 1em;
+}
+.green {
+  background-color: #e0fbe0;
+  border: 2px solid rgb(0, 165, 5);
+}
+.red {
+  background-color: #fde0e0;
+  border: 2px solid rgb(255, 0, 0);
+}
+.blue {
+  background-color: #9ed4ff;
+  border: 2px solid rgb(0, 127, 247);
+}
+
+.user button {
+  padding: 6px 12px;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+.user p{
+  display: none;
+}
+
+/* ✅ Vista de escritorio */
+@media (min-width: 1024px) {
+  .dashboard-container {
+    grid-template-areas: "logo stats user";
+    grid-template-columns: 1fr 3fr 1fr;
+    padding: 0.5em 2em;
+  }
+
+  .stats-wrapper {
+    justify-content: space-around;
+  }
+  .logo img{
+    height: 3em;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.2em 0.5em;
+    border-radius: 5px;
+    width: 8em;
+    text-align: center;
+  }
+  .user p{
+    display: block;
+  }
+  
+}
+

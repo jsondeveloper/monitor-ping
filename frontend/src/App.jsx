@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
+
 
 function App() {
   const [ipInput, setIpInput] = useState('');
@@ -11,6 +13,43 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginCredentials, setLoginCredentials] = useState({ username: '', password: '', role: '' });
+  const [username, setUsername] = useState('');
+  const [role, setRole] = useState('');
+  const [totalDevices, setTotalDevices] = useState(0);
+const [activeDevices, setActiveDevices] = useState(0);
+const [inactiveDevices, setInactiveDevices] = useState(0);
+
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setRole(decoded.role);
+      } catch (err) {
+        console.error('Error al decodificar token:', err);
+      }
+    }
+  }, []);
+
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+  }, []);
+
+  useEffect(() => {
+    const savedAuth = localStorage.getItem('isAuthenticated');
+    const savedUsername = localStorage.getItem('username');
+    if (savedAuth === 'true') {
+      setIsAuthenticated(true);
+      setLoginCredentials((prev) => ({ ...prev, username: savedUsername || '' }));
+    }
+  }, []);
 
   useEffect(() => {
     if (message) {
@@ -115,6 +154,39 @@ function App() {
     pingAll(ips);
   };
 
+  const handleLoginChange = (e) => {
+    const { name, value } = e.target;
+    setLoginCredentials({ ...loginCredentials, [name]: value });
+  };
+
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.post('http://localhost:3001/login', loginCredentials);
+      if (res.status === 200) {
+        const { token } = res.data;
+
+        localStorage.setItem('token', token); // Guarda el token
+        localStorage.setItem('username', loginCredentials.username);
+        localStorage.setItem('isAuthenticated', 'true');
+
+        // Decodifica el token para obtener el rol
+        const decoded = jwtDecode(token);
+        const userRole = decoded.role;
+        setRole(userRole); // Actualiza el estado del rol
+        localStorage.setItem('role', userRole); // Guarda también el rol si quieres persistencia
+
+        setIsAuthenticated(true);
+        setMessage('Inicio de sesión exitoso');
+      }
+    } catch (error) {
+      console.error('Error de login:', error);
+      setMessage('Credenciales incorrectas');
+    }
+  };
+
+
+
   const groupDevicesBySegment = () => {
     const groups = devices.reduce((acc, device) => {
       const segment = device.ip.split('.').slice(0, 3).join('.');
@@ -131,6 +203,20 @@ function App() {
     setActiveTab(segment);
   };
 
+  useEffect(() => {
+    const segmentDevices = activeTab
+      ? devices.filter((d) => d.ip.startsWith(activeTab))
+      : devices;
+  
+    const total = segmentDevices.length;
+    const active = segmentDevices.filter((d) => d.alive).length;
+    const inactive = total - active;
+  
+    setTotalDevices(total);
+    setActiveDevices(active);
+    setInactiveDevices(inactive);
+  }, [activeTab, devices]);
+  
   const DeviceTree = ({ devices, parentId = null, isRoot = true }) => {
     const children = devices.filter((device) => {
       const deviceParentId = device.parent?._id || null;
@@ -172,7 +258,7 @@ function App() {
                 <div
                   style={{
                     position: 'absolute',
-                    top: -10,
+                    top: -8,
                     left: -20,
                     width: 20,
                     height: 2,
@@ -217,11 +303,15 @@ function App() {
         />
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
           <span>
-            -| <strong>{device.name || 'Sin nombre'}</strong> | {device.ip}
+            | <strong>{device.name || 'Sin nombre'}</strong> | {device.ip}
             {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢` : `🔴`}
           </span>
         </div>
-        <button onClick={() => deleteDevice(device.ip)} style={{ marginLeft: 10 }}>Eliminar</button>
+        {role === 'admin' && (
+          <button onClick={() => deleteDevice(device.ip)} style={{ marginLeft: 10 }}>
+            Eliminar
+          </button>
+        )}
       </div>
     );
   };
@@ -232,122 +322,202 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchDevices();
+      const interval = setInterval(fetchDevices, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
   const deviceGroups = groupDevicesBySegment();
   const filteredDevices = activeTab
     ? devices.filter((d) => d.ip.startsWith(activeTab))
     : devices;
 
+  const handleLogout = () => {
+    localStorage.removeItem('username');
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.setItem('isAuthenticated', 'false');
+    setIsAuthenticated(false);
+    setUsername('');
+    setLoginCredentials({ username: '', password: '' });
+    setMessage('Sesión cerrada');
+  };
+
   return (
-    <div style={{ position: 'relative', fontFamily: 'Arial, sans-serif' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: 20 }}>Monitor de Dispositivos</h1>
+    <div>
+      {isAuthenticated ? (
+        <div style={{ position: 'relative' }}>
 
-      <div
-        style={{
-          margin: 20,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 10,
-        }}
-      >
-        <select value={typeInput} onChange={(e) => setTypeInput(e.target.value)} style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }}>
-          <option value="router">Router</option>
-          <option value="antena">Antena</option>
-          <option value="server">Servidor</option>
-        </select>
-        <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder="Nombre" style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
-        <input value={ipInput} onChange={(e) => setIpInput(e.target.value)} placeholder="IP" style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
-        <input value={portInput} onChange={(e) => setPortInput(e.target.value)} placeholder="Puerto (opcional)" style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }} />
-        <select value={parentInput} onChange={(e) => setParentInput(e.target.value)} style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }}>
-          <option value="">Dispositivo Padre (opcional)</option>
-          {devices.map((device) => (
-            <option key={device._id} value={device._id}>
-              {device.ip} - {device.name}
-            </option>
-          ))}
-        </select>
-        <button onClick={addDevice} style={{ padding: 10, borderRadius: 6, backgroundColor: '#4CAF50', cursor: 'pointer', color: '#fff', border: 'none' }}>Agregar Dispositivo</button>
-      </div>
+          <div className="dashboard-container">
+            <div className="item logo">
+              <img src="/images/logo.png" alt="logo" />
+            </div>
 
-      {message && (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '20px 24px',
-            margin: '10px auto',
-            maxWidth: '400px',
-            borderRadius: '8px',
-            color: '#fff',
-            width: '100%',
-            fontWeight: 'bold',
-            position: 'fixed',
-            top: 0,
-            left: '50%',
-            fontSize: '1rem',
-            backgroundColor: message.includes('éxito') || message.includes('exitosamente') ? '#38a169' : '#e53e3e',
-            opacity: message ? 1 : 0,
-            transform: message ? 'translateY(0)' : 'translateY(-10px)',
-            transform: 'translate(-50%, 25%)',
-            transition: 'all 0.5s ease-in-out',
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)',
-          }}
-        >
-          {message}
+            <div className="stats-wrapper">
+              <div className="item stat">
+                <div className="badge green">
+                  <p><strong>{activeDevices}</strong> Activos</p>
+                </div>
+              </div>
+
+              <div className="item stat">
+                <div className="badge red">
+                  <p ><strong>{inactiveDevices}</strong> Inactivos</p>
+                </div>
+              </div>
+
+              <div className="item stat">
+                <div className="badge blue">
+                  <p><strong>{totalDevices}</strong> EnTotal</p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                  justifyContent: 'center',
+                  width: '100%'
+                }}
+              >
+                <button
+                  onClick={() => setActiveTab('')}
+                  style={{
+                    padding: '4px 16px',
+                    borderRadius: '4px',
+                    backgroundColor: activeTab === '' ? '#007bff' : '#f8f9fa',
+                    color: activeTab === '' ? '#fff' : '#495057',
+                    border: '1px solid #ced4da',
+                    cursor: 'pointer',
+                    fontWeight: activeTab === '' ? 'bold' : 'normal',
+                  }}
+                >
+                  Todos
+                </button>
+                {Object.keys(deviceGroups).sort().map((segment) => (
+                  <button
+                    key={segment}
+                    onClick={() => handleTabChange(segment)}
+                    style={{
+                      padding: '4px 16px',
+                      borderRadius: '4px',
+                      backgroundColor: activeTab === segment ? '#007bff' : '#f8f9fa',
+                      color: activeTab === segment ? '#fff' : '#495057',
+                      border: '1px solid #ced4da',
+                      cursor: 'pointer',
+                      fontWeight: activeTab === segment ? 'bold' : 'normal',
+                    }}
+                  >
+                    {segment}.x
+                  </button>
+                ))}
+                <button onClick={handleUpdateDevices} style={{ padding: 5, borderRadius: 4, cursor: 'pointer', backgroundColor: '#28a745', color: '#fff', border: 'none' }}>Actualizar Estado</button>
+              </div>
+            </div>
+
+            <div className="item user">
+              <p style={{ margin: '0 0 5px', color: '#fff' }}>
+                ¡Hola! <strong>{loginCredentials.username}</strong>
+              </p>
+              <button onClick={handleLogout}>Cerrar sesión</button>
+            </div>
+
+
+          </div>
+
+
+
+          {role === 'admin' && (
+            <div
+              style={{
+                margin: '2em',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: 10,
+                alignItems: 'center',
+              }}
+            >
+              <select value={typeInput} onChange={(e) => setTypeInput(e.target.value)} style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}>
+                <option value="router">Router</option>
+                <option value="antena">Antena</option>
+                <option value="server">Servidor</option>
+              </select>
+              <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder="Nombre" style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }} />
+              <input value={ipInput} onChange={(e) => setIpInput(e.target.value)} placeholder="IP" style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }} />
+              <input value={portInput} onChange={(e) => setPortInput(e.target.value)} placeholder="Puerto (opcional)" style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }} />
+              <select value={parentInput} onChange={(e) => setParentInput(e.target.value)} style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}>
+                <option value="">Dispositivo Padre (opcional)</option>
+                {devices.map((device) => (
+                  <option key={device._id} value={device._id}>
+                    {device.ip} - {device.name}
+                  </option>
+                ))}
+              </select>
+              <button onClick={addDevice} style={{ padding: 10, borderRadius: 4, backgroundColor: '#28a745', cursor: 'pointer', color: '#fff', border: 'none' }}>Agregar Dispositivo</button>
+            </div>
+          )}
+          {message && (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '20px',
+                margin: '0 auto',
+                borderRadius: '8px',
+                top: 0,
+                color: '#fff',
+                width: '100%',
+                height: '2em',
+                fontWeight: 'bold',
+                position: 'fixed',
+                top: 0,
+                left: '50%',
+                fontSize: '1.5rem',
+                backgroundColor: message.includes('éxito') || message.includes('exitosamente') || message.includes('exitoso') ? '#38a169' : '#e53e3e',
+                opacity: message ? 1 : 0,
+                transform: message ? 'translateY(0)' : 'translateY(0)',
+                transform: 'translate(-50%, 0%)',
+                transition: 'all 0.5s ease-in-out',
+                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)',
+              }}
+            >
+              {message}
+            </div>
+          )}
+
+
+
+          <DeviceTree devices={filteredDevices} />
+
+          {loading && <LoadingOverlay />}
         </div>
+
+
+      ) : (
+        <form onSubmit={handleLoginSubmit}>
+          <input
+            type="text"
+            name="username"
+            value={loginCredentials.username}
+            onChange={handleLoginChange}
+            placeholder="Usuario"
+          />
+          <input
+            type="password"
+            name="password"
+            value={loginCredentials.password}
+            onChange={handleLoginChange}
+            placeholder="Contraseña"
+          />
+          <button type="submit">Iniciar sesión</button>
+        </form>
       )}
-
-
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '10px',
-          justifyContent: 'center',
-          margin: 20,
-        }}
-      >
-        <button
-          onClick={() => setActiveTab('')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '6px',
-            backgroundColor: activeTab === '' ? '#4CAF50' : '#f0f0f0',
-            color: activeTab === '' ? '#fff' : '#333',
-            border: '1px solid #ccc',
-            cursor: 'pointer',
-            fontWeight: activeTab === '' ? 'bold' : 'normal',
-          }}
-        >
-          Todos
-        </button>
-
-        {Object.keys(deviceGroups).map((segment) => (
-          <button
-            key={segment}
-            onClick={() => handleTabChange(segment)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
-              backgroundColor: activeTab === segment ? '#4CAF50' : '#f0f0f0',
-              color: activeTab === segment ? '#fff' : '#333',
-              border: '1px solid #ccc',
-              cursor: 'pointer',
-              fontWeight: activeTab === segment ? 'bold' : 'normal',
-            }}
-          >
-            {segment}.x
-          </button>
-        ))}
-
-        <button onClick={handleUpdateDevices} style={{ padding: 10, borderRadius: 6, cursor: 'pointer', backgroundColor: '#2196F3', color: '#fff', border: 'none' }}>Actualizar Estado</button>
-      </div>
-
-      <DeviceTree devices={filteredDevices} />
-
-      {loading && <LoadingOverlay />}
     </div>
   );
 }
-
 const LoadingOverlay = () => (
   <div
     style={{
@@ -373,7 +543,6 @@ const LoadingOverlay = () => (
         animation: 'spin 1s linear infinite',
       }}
     />
-     </div>
+  </div>
 );
-
 export default App;

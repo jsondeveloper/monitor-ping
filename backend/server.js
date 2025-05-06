@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const tcpp = require('tcp-ping');
 const ping = require('ping'); // ICMP
+const bcrypt = require('bcryptjs');  // Para encriptar contraseñas
+const jwt = require('jsonwebtoken'); // Para generar JWT
 
 const app = express();
 app.use(cors());
@@ -33,6 +35,17 @@ const deviceSchema = new mongoose.Schema({
 
 const Device = mongoose.model('Device', deviceSchema);
 
+// Esquema de usuario
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'user'], default: 'user' }
+}, {
+  versionKey: false // Esto deshabilita el campo `__v`
+});
+
+const User = mongoose.model('User', userSchema);
+
 // Función combinada TCP + ICMP
 async function pingDevice(ip, port = 80) {
   return new Promise((resolve) => {
@@ -48,7 +61,63 @@ async function pingDevice(ip, port = 80) {
   });
 }
 
-// Rutas
+// Middleware de autenticación
+const authenticateToken = (req, res, next) => {
+  const token = req.headers['authorization'];
+
+  if (!token) return res.status(403).json({ error: 'Acceso denegado' });
+
+  jwt.verify(token, 'SECRET_KEY', (err, user) => {
+    if (err) return res.status(403).json({ error: 'Token no válido' });
+    req.user = user;
+    next();
+  });
+};
+
+// Rutas de autenticación
+app.post('/register', async (req, res) => {
+  const { username, password, role } = req.body;
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const user = new User({ username, password: hashedPassword, role });
+
+  try {
+    await user.save();
+    res.status(201).json({ message: 'Usuario registrado' });
+  } catch (err) {
+    console.error('Error al registrar usuario:', err);
+    res.status(500).json({ error: 'Error al registrar el usuario', details: err.message });
+  }
+});
+
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  const user = await User.findOne({ username });
+  if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
+
+  const validPassword = await bcrypt.compare(password, user.password);
+  if (!validPassword) return res.status(400).json({ error: 'Contraseña incorrecta' });
+
+  const token = jwt.sign({ username: user.username, role: user.role }, 'SECRET_KEY', { expiresIn: '1h' });
+
+  res.json({ token });
+});
+
+// Rutas protegidas solo para admin
+app.get('/admin/devices', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Acceso solo para administradores' });
+
+  try {
+    const devices = await Device.find().populate('parent', 'ip name');
+    res.json(devices);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener dispositivos' });
+  }
+});
+
+// Rutas de dispositivos (sin cambios)
 app.get('/devices', async (req, res) => {
   try {
     const devices = await Device.find().populate('parent', 'ip name');
@@ -94,7 +163,6 @@ app.delete('/devices/:ip', async (req, res) => {
   }
 });
 
-// Ruta para hacer ping desde el frontend
 app.post('/ping', async (req, res) => {
   const { devices } = req.body;
 
