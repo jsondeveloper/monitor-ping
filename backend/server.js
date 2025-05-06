@@ -163,6 +163,32 @@ app.delete('/devices/:ip', async (req, res) => {
   }
 });
 
+app.put('/devices/:ip', async (req, res) => {
+  const { ip } = req.params;
+
+  const updates = req.body;
+
+  // Opcional: restringir campos permitidos
+  const allowedFields = ['name', 'type', 'port', 'parent'];
+  const updateData = {};
+  for (const key of allowedFields) {
+    if (updates[key] !== undefined) {
+      updateData[key] = updates[key];
+    }
+  }
+
+  try {
+    const updated = await Device.findOneAndUpdate({ ip }, updateData, { new: true });
+    if (!updated) {
+      return res.status(404).json({ error: 'Dispositivo no encontrado' });
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al actualizar dispositivo', details: err.message });
+  }
+});
+
+
 app.post('/ping', async (req, res) => {
   const { devices } = req.body;
 

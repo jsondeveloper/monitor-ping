@@ -23,6 +23,12 @@ li::before {
 
 button{
   cursor: pointer;
+  transition: all 0.2s ease; /* suaviza todos los cambios */
+}
+button:hover{
+  cursor: pointer;
+  transform: scale(1.1); /* efecto de agrandamiento */
+  
 }
 
 @keyframes spin {
@@ -59,8 +65,8 @@ button{
 .stats-wrapper {
   grid-area: stats;
   display: flex;
-  justify-content: space-around;
-  gap: 0.8em;
+  justify-content: center;
+  gap: 0.4em;
   flex-wrap: wrap;
 }
 
@@ -72,24 +78,23 @@ button{
   display: inline-block;
   padding: 0.2em 0.5em;
   border-radius: 5px;
-  width: 5em;
   text-align: center;
 }
 .badge p {
-  margin: 0;
-  font-size: 1em;
+  margin: 0;  
+  font-size: 0.9em;
 }
 .green {
   background-color: #e0fbe0;
-  border: 2px solid rgb(0, 165, 5);
+  border: 1px solid rgb(0, 165, 5);
 }
 .red {
   background-color: #fde0e0;
-  border: 2px solid rgb(255, 0, 0);
+  border: 1px solid rgb(255, 0, 0);
 }
 .blue {
   background-color: #9ed4ff;
-  border: 2px solid rgb(0, 127, 247);
+  border: 1px solid rgb(0, 127, 247);
 }
 
 .user button {
@@ -112,7 +117,7 @@ button{
   }
 
   .stats-wrapper {
-    justify-content: space-around;
+    justify-content: center;
   }
   .logo img{
     height: 3em;
@@ -121,8 +126,8 @@ button{
     display: inline-block;
     padding: 0.2em 0.5em;
     border-radius: 5px;
-    width: 8em;
     text-align: center;
+    font-size: 0.9em;
   }
   .user p{
     display: block;

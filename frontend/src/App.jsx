@@ -18,8 +18,11 @@ function App() {
   const [username, setUsername] = useState('');
   const [role, setRole] = useState('');
   const [totalDevices, setTotalDevices] = useState(0);
-const [activeDevices, setActiveDevices] = useState(0);
-const [inactiveDevices, setInactiveDevices] = useState(0);
+  const [activeDevices, setActiveDevices] = useState(0);
+  const [inactiveDevices, setInactiveDevices] = useState(0);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deviceToEdit, setDeviceToEdit] = useState(null);
+
 
 
   useEffect(() => {
@@ -76,6 +79,21 @@ const [inactiveDevices, setInactiveDevices] = useState(0);
       console.error('Error fetching devices:', err);
     } finally {
       setLoading(false);
+    }
+  };
+  const openEditModal = (device) => {
+    setDeviceToEdit(device);
+    setEditModalOpen(true);
+  };
+  const handleUpdateDevice = async () => {
+    try {
+      await axios.put(`http://localhost:3001/devices/${deviceToEdit.ip}`, deviceToEdit);
+      setMessage('Dispositivo actualizado exitosamente');
+      fetchDevices(); // Vuelve a cargar los dispositivos
+      setEditModalOpen(false); // Cierra el modal
+    } catch (err) {
+      console.error('Error al actualizar dispositivo:', err);
+      setMessage('Error al actualizar dispositivo');
     }
   };
 
@@ -207,16 +225,16 @@ const [inactiveDevices, setInactiveDevices] = useState(0);
     const segmentDevices = activeTab
       ? devices.filter((d) => d.ip.startsWith(activeTab))
       : devices;
-  
+
     const total = segmentDevices.length;
     const active = segmentDevices.filter((d) => d.alive).length;
     const inactive = total - active;
-  
+
     setTotalDevices(total);
     setActiveDevices(active);
     setInactiveDevices(inactive);
   }, [activeTab, devices]);
-  
+
   const DeviceTree = ({ devices, parentId = null, isRoot = true }) => {
     const children = devices.filter((device) => {
       const deviceParentId = device.parent?._id || null;
@@ -304,14 +322,21 @@ const [inactiveDevices, setInactiveDevices] = useState(0);
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
           <span>
             | <strong>{device.name || 'Sin nombre'}</strong> | {device.ip}
-            {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢` : `🔴`}
+            {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢 ` : `🔴 `}
           </span>
         </div>
         {role === 'admin' && (
-          <button onClick={() => deleteDevice(device.ip)} style={{ marginLeft: 10 }}>
-            Eliminar
-          </button>
+          <>
+            
+            <button onClick={() => openEditModal(device)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft:5 }}>
+            ✏️ 
+            </button>
+            <button onClick={() => deleteDevice(device.ip)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft:5 }}>
+            ❌ 
+            </button>
+          </>
         )}
+
       </div>
     );
   };
@@ -359,19 +384,19 @@ const [inactiveDevices, setInactiveDevices] = useState(0);
             <div className="stats-wrapper">
               <div className="item stat">
                 <div className="badge green">
-                  <p><strong>{activeDevices}</strong> Activos</p>
+                  <p><strong>{activeDevices}</strong> Activos 🟢</p>
                 </div>
               </div>
 
               <div className="item stat">
                 <div className="badge red">
-                  <p ><strong>{inactiveDevices}</strong> Inactivos</p>
+                  <p ><strong>{inactiveDevices}</strong> Inactivos 🔴</p>
                 </div>
               </div>
 
               <div className="item stat">
                 <div className="badge blue">
-                  <p><strong>{totalDevices}</strong> EnTotal</p>
+                  <p><strong>{totalDevices}</strong> EnTotal 🔵</p>
                 </div>
               </div>
 
@@ -381,7 +406,8 @@ const [inactiveDevices, setInactiveDevices] = useState(0);
                   flexWrap: 'wrap',
                   gap: '10px',
                   justifyContent: 'center',
-                  width: '100%'
+                  width: '100%',
+                  padding: '10px 0'
                 }}
               >
                 <button
@@ -491,6 +517,65 @@ const [inactiveDevices, setInactiveDevices] = useState(0);
 
 
           <DeviceTree devices={filteredDevices} />
+
+          {editModalOpen && deviceToEdit && (
+            <div style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex', justifyContent: 'center', alignItems: 'center',
+            }}>
+              <div style={{ backgroundColor: '#fff', padding: 20, borderRadius: 8, minWidth: 300 }}>
+                <h3>Editar Dispositivo</h3>
+                <label>Nombre:</label>
+                <input
+                  type="text"
+                  value={deviceToEdit.name}
+                  onChange={(e) => setDeviceToEdit({ ...deviceToEdit, name: e.target.value })}
+                /><br />
+                <label>IP:</label>
+                <input
+                  type="text"
+                  value={deviceToEdit.ip}
+                  disabled
+                /><br />
+                <label>Puerto:</label>
+                <input
+                  type="text"
+                  value={deviceToEdit.port}
+                  onChange={(e) => setDeviceToEdit({ ...deviceToEdit, port: e.target.value })}
+                /><br />
+                <label>Tipo:</label>
+                <select
+                  value={deviceToEdit.type}
+                  onChange={(e) => setDeviceToEdit({ ...deviceToEdit, type: e.target.value })}
+                >
+                  <option value="router">Router</option>
+                  <option value="antena">Antena</option>
+                  <option value="server">Servidor</option>
+                </select><br />
+
+                <label>Dispositivo Padre:</label>
+                <select
+                  value={deviceToEdit.parent || ''}
+                  onChange={(e) => setDeviceToEdit({ ...deviceToEdit, parent: e.target.value })}
+                >
+                  <option value="">Sin padre</option>
+                  {devices
+                    .filter((d) => d.ip !== deviceToEdit.ip)
+                    .map((device) => (
+                      <option key={device._id} value={device._id}>
+                        {device.name} ({device.ip})
+                      </option>
+                    ))}
+                </select><br /><br />
+
+                <button onClick={handleUpdateDevice}>Guardar</button>
+                <button onClick={() => setEditModalOpen(false)} style={{ marginLeft: 10 }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
 
           {loading && <LoadingOverlay />}
         </div>
