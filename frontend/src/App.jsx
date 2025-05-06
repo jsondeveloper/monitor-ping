@@ -87,7 +87,12 @@ function App() {
   };
   const handleUpdateDevice = async () => {
     try {
-      await axios.put(`http://localhost:3001/devices/${deviceToEdit.ip}`, deviceToEdit);
+      const updatedDevice = {
+        ...deviceToEdit,
+        port: deviceToEdit.port?.toString().trim() === '' ? '80' : deviceToEdit.port,
+      };
+  
+      await axios.put(`http://localhost:3001/devices/${deviceToEdit.ip}`, updatedDevice);
       setMessage('Dispositivo actualizado exitosamente');
       fetchDevices(); // Vuelve a cargar los dispositivos
       setEditModalOpen(false); // Cierra el modal
@@ -96,6 +101,7 @@ function App() {
       setMessage('Error al actualizar dispositivo');
     }
   };
+  
 
   const addDevice = async () => {
     if (!isValidIP(ipInput)) {
@@ -542,7 +548,7 @@ function App() {
                 <label>Puerto:</label>
                 <input
                   type="text"
-                  value={deviceToEdit.port}
+                  value={deviceToEdit?.port}
                   onChange={(e) => setDeviceToEdit({ ...deviceToEdit, port: e.target.value })}
                 /><br />
                 <label>Tipo:</label>
