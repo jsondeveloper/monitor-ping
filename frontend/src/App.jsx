@@ -376,7 +376,7 @@ function App() {
 
     return (
       role !== 'admin' ? (
-        <a href={`http://${device.ip}`} target="_blank" rel="noopener noreferrer">
+        <a href={`http://${device.ip}:${device.port}`} target="_blank" rel="noopener noreferrer">
           {renderDeviceContent(device)}
         </a>
       ) : (
