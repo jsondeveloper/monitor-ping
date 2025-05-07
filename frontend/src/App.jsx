@@ -81,17 +81,27 @@ function App() {
       setLoading(false);
     }
   };
+
   const openEditModal = (device) => {
-    setDeviceToEdit(device);
-    setEditModalOpen(true);
+    setDeviceToEdit(device); // Primero, asignas el dispositivo que se va a editar
+    setEditModalOpen(true);   // Luego abres el modal
   };
+
+  // Asegúrate de que el useEffect depende de 'deviceToEdit' para actualizar 'parentInput'
+  useEffect(() => {
+    if (deviceToEdit) {
+      // Si deviceToEdit es válido, actualiza el parentInput
+      setParentInput(deviceToEdit.parent?._id || '');
+    }
+  }, [deviceToEdit]); // Este useEffect solo se ejecuta cuando deviceToEdit cambia
+
   const handleUpdateDevice = async () => {
     try {
       const updatedDevice = {
         ...deviceToEdit,
         port: deviceToEdit.port?.toString().trim() === '' ? '80' : deviceToEdit.port,
       };
-  
+
       await axios.put(`http://localhost:3001/devices/${deviceToEdit.ip}`, updatedDevice);
       setMessage('Dispositivo actualizado exitosamente');
       fetchDevices(); // Vuelve a cargar los dispositivos
@@ -101,7 +111,7 @@ function App() {
       setMessage('Error al actualizar dispositivo');
     }
   };
-  
+
 
   const addDevice = async () => {
     if (!isValidIP(ipInput)) {
@@ -201,7 +211,8 @@ function App() {
         localStorage.setItem('role', userRole); // Guarda también el rol si quieres persistencia
 
         setIsAuthenticated(true);
-        setMessage('Inicio de sesión exitoso');
+        setMessage(`Bienvenido ${loginCredentials.username}`);
+
       }
     } catch (error) {
       console.error('Error de login:', error);
@@ -333,12 +344,12 @@ function App() {
         </div>
         {role === 'admin' && (
           <>
-            
-            <button onClick={() => openEditModal(device)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft:5 }}>
-            ✏️ 
+
+            <button onClick={() => openEditModal(device)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}>
+              ✏️
             </button>
-            <button onClick={() => deleteDevice(device.ip)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft:5 }}>
-            ❌ 
+            <button onClick={() => deleteDevice(device.ip)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}>
+              ❌
             </button>
           </>
         )}
@@ -508,7 +519,7 @@ function App() {
                 top: 0,
                 left: '50%',
                 fontSize: '1.5rem',
-                backgroundColor: message.includes('éxito') || message.includes('exitosamente') || message.includes('exitoso') ? '#38a169' : '#e53e3e',
+                backgroundColor: message.includes('Bienvenido') || message.includes('exitosamente') || message.includes('exitoso') ? '#38a169' : '#e53e3e',
                 opacity: message ? 1 : 0,
                 transform: message ? 'translateY(0)' : 'translateY(0)',
                 transform: 'translate(-50%, 0%)',
@@ -566,7 +577,11 @@ function App() {
                   value={deviceToEdit.parent || ''}
                   onChange={(e) => setDeviceToEdit({ ...deviceToEdit, parent: e.target.value })}
                 >
-                  <option value="">Sin padre</option>
+                  <option value="">
+                    {deviceToEdit.parent?.ip
+                      ? `${deviceToEdit.parent.ip} (${deviceToEdit.parent.name})`
+                      : 'Sin Padre'}
+                  </option>
                   {devices
                     .filter((d) => d.ip !== deviceToEdit.ip)
                     .map((device) => (
