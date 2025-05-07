@@ -317,7 +317,7 @@ function App() {
   const DeviceNode = ({ device }) => {
     const backgroundColor = device.alive ? '#e0fbe0' : '#fde0e0';
 
-    return (
+    const renderDeviceContent = (device) => (
       <div
         style={{
           display: 'inline-flex',
@@ -339,23 +339,38 @@ function App() {
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
           <span>
             | <strong>{device.name || 'Sin nombre'}</strong> | {device.ip}
-            {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢 ` : `🔴 `}
+            {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢` : `🔴`}
           </span>
         </div>
         {role === 'admin' && (
           <>
-
-            <button onClick={() => openEditModal(device)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}>
+            <button
+              onClick={() => openEditModal(device)}
+              style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}
+            >
               ✏️
             </button>
-            <button onClick={() => deleteDevice(device.ip)} style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}>
+            <button
+              onClick={() => deleteDevice(device.ip)}
+              style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}
+            >
               ❌
             </button>
           </>
         )}
-
       </div>
     );
+
+    return (
+      role !== 'admin' ? (
+        <a href={`http://${device.ip}`} target="_blank" rel="noopener noreferrer">
+          {renderDeviceContent(device)}
+        </a>
+      ) : (
+        renderDeviceContent(device)
+      )
+    );
+
   };
 
   useEffect(() => {

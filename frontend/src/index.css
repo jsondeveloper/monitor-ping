@@ -30,6 +30,16 @@ button:hover{
   transform: scale(1.1); /* efecto de agrandamiento */
   
 }
+a{
+  display: inline-block;
+  text-decoration: none;
+  color: #000;
+  transition: all 0.2s ease; /* suaviza todos los cambios */
+}
+a:hover{
+  cursor: pointer;
+  transform: scale(1.1); /* efecto de agrandamiento */
+}
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
