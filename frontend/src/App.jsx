@@ -328,27 +328,34 @@ function App() {
           display: 'inline-flex',
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-around',
+          justifyContent: 'space-between',
           border: '1px solid #ddd',
           padding: 5,
           backgroundColor,
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           fontSize: '0.8em',
+          width: '21.5em',
         }}
       >
+        
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', lineHeight: 1 }}>
         <img
           src={getDeviceImage(device.type)}
           alt={device.type}
           style={{ width: 20, height: 20, marginRight: 5 }}
         />
+          <span>
+            | <strong>{device.name || 'Sin nombre'}</strong> 
+          </span>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
           <span>
-            | <strong>{device.name || 'Sin nombre'}</strong> | {device.ip}
+             {device.ip}
             {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢` : `🔴`}
           </span>
         </div>
         {role === 'admin' && (
-          <>
+          <><div>
             <button
               onClick={() => openEditModal(device)}
               style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}
@@ -361,6 +368,7 @@ function App() {
             >
               ❌
             </button>
+            </div>
           </>
         )}
       </div>
