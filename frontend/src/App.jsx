@@ -63,7 +63,7 @@ function App() {
     }
   }, [message]);
 
-  
+
   const isValidIP = (ip) => {
     const regex =
       /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -75,7 +75,7 @@ function App() {
     try {
       const res = await axios.get('http://localhost:3001/devices');
       setDevices(res.data);
-      pingAll(res.data.map((d) => d.ip));
+
     } catch (err) {
       console.error('Error fetching devices:', err);
     } finally {
@@ -103,7 +103,7 @@ function App() {
         port: deviceToEdit.port?.toString().trim() === '' ? '80' : deviceToEdit.port,
       };
 
-      await axios.put(`http://localhost:3001/devices/${deviceToEdit.ip}`, updatedDevice);
+      await axios.put(`http://localhost:3001/devices/${deviceToEdit._id}`, updatedDevice);
       setMessage('Dispositivo actualizado exitosamente');
       fetchDevices(); // Vuelve a cargar los dispositivos
       setEditModalOpen(false); // Cierra el modal
@@ -121,6 +121,13 @@ function App() {
     }
     if (!isValidIP(ipInput)) {
       setMessage('IP no válida');
+      return;
+    }
+
+    // Verifica si la combinación IP y puerto ya existe
+    const existingDevice = devices.find(device => device.ip === ipInput && device.port === portInput);
+    if (existingDevice) {
+      setMessage('Ya existe un dispositivo con esta IP y puerto');
       return;
     }
 
@@ -145,10 +152,10 @@ function App() {
     }
   };
 
-  const deleteDevice = async (ip) => {
+  const deleteDevice = async (_id) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este dispositivo?')) {
       try {
-        await axios.delete(`http://localhost:3001/devices/${ip}`);
+        await axios.delete(`http://localhost:3001/devices/${_id}`);
         fetchDevices();
       } catch (err) {
         console.error('Error deleting device:', err);
@@ -160,7 +167,20 @@ function App() {
   const pingAll = async (ips) => {
     setLoading(true);
     try {
+      // Validar que ips sea un array de cadenas
+      if (!Array.isArray(ips)) {
+        throw new Error('ips debe ser un array');
+      }
+
+      // Hacer la solicitud al servidor
       const res = await axios.post('http://localhost:3001/ping', { devices: ips });
+
+      // Verificar que res.data sea un array
+      if (!Array.isArray(res.data)) {
+        throw new Error('La respuesta del servidor no es un array');
+      }
+
+      // Actualizar el estado de los dispositivos
       setDevices((prev) =>
         prev.map((dev) => {
           const found = res.data.find((d) => d.ip === dev.ip);
@@ -169,7 +189,7 @@ function App() {
       );
     } catch (err) {
       console.error('Error pinging devices:', err);
-      setMessage('Error al hacer ping a los dispositivos');
+      setMessage(`Error al hacer ping a los dispositivos: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -337,20 +357,20 @@ function App() {
           width: '21.5em',
         }}
       >
-        
+
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', lineHeight: 1 }}>
-        <img
-          src={getDeviceImage(device.type)}
-          alt={device.type}
-          style={{ width: 20, height: 20, marginRight: 5 }}
-        />
+          <img
+            src={getDeviceImage(device.type)}
+            alt={device.type}
+            style={{ width: 20, height: 20, marginRight: 5 }}
+          />
           <span>
-            | <strong>{device.name || 'Sin nombre'}</strong> 
+            | <strong>{device.name || 'Sin nombre'}</strong>
           </span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
           <span>
-             {device.ip}
+            {device.ip}
             {device.port !== 80 ? `:${device.port}` : ''} | {device.alive ? `🟢` : `🔴`}
           </span>
         </div>
@@ -363,12 +383,12 @@ function App() {
               ✏️
             </button>
             <button
-              onClick={() => deleteDevice(device.ip)}
+              onClick={() => deleteDevice(device._id)}
               style={{ margin: 0, padding: 0, background: 'transparent', border: 'none', marginLeft: 5 }}
             >
               ❌
             </button>
-            </div>
+          </div>
           </>
         )}
       </div>
@@ -385,12 +405,6 @@ function App() {
     );
 
   };
-
-  useEffect(() => {
-    fetchDevices();
-    const interval = setInterval(fetchDevices, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -582,7 +596,7 @@ function App() {
                 <input
                   type="text"
                   value={deviceToEdit.ip}
-                  disabled
+                  onChange={(e) => setDeviceToEdit({ ...deviceToEdit, ip: e.target.value })}
                 /><br />
                 <label>Puerto:</label>
                 <input
