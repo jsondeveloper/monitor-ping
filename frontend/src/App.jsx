@@ -63,6 +63,7 @@ function App() {
     }
   }, [message]);
 
+  
   const isValidIP = (ip) => {
     const regex =
       /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -114,6 +115,10 @@ function App() {
 
 
   const addDevice = async () => {
+    if (!nameInput) {
+      setMessage('Define un nombre para el dispositivo');
+      return;
+    }
     if (!isValidIP(ipInput)) {
       setMessage('IP no válida');
       return;
