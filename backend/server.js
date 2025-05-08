@@ -48,6 +48,11 @@ const User = mongoose.model('User', userSchema);
 
 // Función combinada TCP + ICMP
 async function pingDevice(ip, port = 80) {
+  // Validar el puerto
+  if (port < 0 || port > 65535) {
+    throw new Error(`El puerto ${port} es inválido. Debe estar en el rango de 0 a 65535.`);
+  }
+
   return new Promise((resolve) => {
     tcpp.probe(ip, port, async (err, aliveTCP) => {
       if (err || !aliveTCP) {
@@ -60,6 +65,7 @@ async function pingDevice(ip, port = 80) {
     });
   });
 }
+
 
 // Middleware de autenticación
 const authenticateToken = (req, res, next) => {
@@ -138,13 +144,22 @@ app.post('/devices', async (req, res) => {
       return res.status(400).json({ error: 'Dispositivo con esta IP y puerto ya existe' });
     }
 
+    // Validar el puerto
+    if (port < 0 || port > 65535) {
+      return res.status(400).json({ error: `El puerto ${port} es inválido. Debe estar en el rango de 0 a 65535.` });
+    }
+
+    // 🟡 Hacer ping antes de guardar
+    const pingResult = await pingDevice(ip, port);
+
     const device = new Device({
       ip,
       name,
       type,
       port,
-      alive: null,
       parent: parent || null,
+      alive: pingResult.alive,
+      method: pingResult.method,
     });
 
     await device.save();
@@ -154,6 +169,8 @@ app.post('/devices', async (req, res) => {
     res.status(500).json({ error: 'Error al agregar dispositivo', details: err.message });
   }
 });
+
+
 
 
 
@@ -182,15 +199,38 @@ app.put('/devices/:id', async (req, res) => {
   }
 
   try {
+    // ✅ Validar el puerto si fue enviado
+    if (
+      updateData.port !== undefined &&
+      (updateData.port < 0 || updateData.port > 65535)
+    ) {
+      return res
+        .status(400)
+        .json({ error: `El puerto ${updateData.port} es inválido. Debe estar en el rango de 0 a 65535.` });
+    }
+
+    // ✅ Realiza la actualización
     const updated = await Device.findByIdAndUpdate(id, updateData, { new: true });
     if (!updated) {
       return res.status(404).json({ error: 'Dispositivo no encontrado' });
     }
+
+    // 🟡 Hacer ping después de actualizar
+    const pingResult = await pingDevice(updated.ip, updated.port);
+
+    // 🟢 Actualizar campos `alive` y `method`
+    updated.alive = pingResult.alive;
+    updated.method = pingResult.method;
+    await updated.save();
+
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: 'Error al actualizar dispositivo', details: err.message });
+    res
+      .status(500)
+      .json({ error: 'Error al actualizar dispositivo', details: err.message });
   }
 });
+
 
 
 
@@ -200,30 +240,33 @@ app.post('/ping', async (req, res) => {
 
   const { devices } = req.body;
 
-  const pingResults = await Promise.all(devices.map(ip =>
+  const pingResults = await Promise.all(devices.map(({ ip, port = 80 }) =>
     limiter(async () => {
-      const device = await Device.findOne({ ip });
-      if (!device) return { ip, alive: false };
-      return await pingDevice(ip, device.port || 80);
+      const device = await Device.findOne({ ip, port }); // ✅ buscar por IP y puerto
+      if (!device) return { ip, port, alive: false };
+      return await pingDevice(ip, port);
     })
   ));
 
   for (let result of pingResults) {
-    await Device.updateOne({ ip: result.ip }, { alive: result.alive, method: result.method });
+    await Device.updateOne(
+      { ip: result.ip, port: result.port }, // ✅ actualizar usando IP y puerto
+      { alive: result.alive, method: result.method }
+    );
   }
 
   res.json(pingResults);
 });
 
+// ... dentro de updateDevicesStatus ...
 const updateDevicesStatus = async () => {
   const limit = (await import('p-limit')).default;
-  const limiter = limit(30); // Limita el número de solicitudes paralelas
+  const limiter = limit(30);
 
-  const devices = await Device.find(); // Obtener todos los dispositivos
+  const devices = await Device.find();
 
-  // Agrupa dispositivos por combinación de IP y Puerto
   const devicesByIpPort = devices.reduce((acc, device) => {
-    const key = `${device.ip}:${device.port}`; // Combina IP y puerto
+    const key = `${device.ip}:${device.port}`;
     if (!acc[key]) acc[key] = [];
     acc[key].push(device);
     return acc;
@@ -231,22 +274,16 @@ const updateDevicesStatus = async () => {
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-  // Ejecuta el ping para cada grupo de IP:Puerto
   const results = await Promise.all(
     Object.entries(devicesByIpPort).map(([ipPortKey, devicesForIpPort]) =>
       limiter(async () => {
-        const [ip, port] = ipPortKey.split(':'); // Separa IP y puerto
-        console.log(`Haciendo ping a IP: ${ip} y Puerto: ${port}`); // Verifica cuál IP:Puerto se está procesando
-
+        const [ip, portStr] = ipPortKey.split(':');
+        const port = parseInt(portStr, 10); // ✅ convertir a número
         const resultsForIpPort = [];
 
         for (const device of devicesForIpPort) {
           const result = await pingDevice(ip, port);
-          console.log(`Resultado de ping para ${ip}:${port}:`, result); // Registra el resultado del ping
-
           resultsForIpPort.push(result);
-
-          // Espera 200 ms entre los pings a la misma IP:Puerto
           await sleep(200);
         }
 
@@ -255,20 +292,18 @@ const updateDevicesStatus = async () => {
     )
   );
 
-  // Aplana los resultados
   const flatResults = results.flat();
 
-  // Actualiza el estado de cada dispositivo
   for (let result of flatResults) {
-    console.log(`Actualizando dispositivo: ${result.ip}:${result.port} con estado ${result.alive ? 'ALIVE' : 'DOWN'}`); // Verifica el dispositivo que se actualiza
     await Device.updateOne(
-      { ip: result.ip, port: result.port },
+      { ip: result.ip, port: result.port }, // ✅ IP y puerto
       { alive: result.alive, method: result.method }
     );
   }
 
   console.log('Actualización de dispositivos completada');
 };
+
 
 // Llamada periódica cada 60 segundos
 setInterval(updateDevicesStatus, 60000);

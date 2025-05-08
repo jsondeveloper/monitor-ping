@@ -97,48 +97,109 @@ function App() {
   }, [deviceToEdit]); // Este useEffect solo se ejecuta cuando deviceToEdit cambia
 
   const handleUpdateDevice = async () => {
+    setLoading(true);
+  
     try {
+      let port = deviceToEdit.port?.toString().trim();
+      let ip = deviceToEdit.ip?.toString().trim();
+  
+      // ✅ Validar IP (solo números y puntos, formato básico IPv4)
+      const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/;
+      if (!ipv4Regex.test(ip)) {
+        setMessage('La dirección IP no es válida. Debe tener el formato IPv4, por ejemplo: 192.168.1.1');
+        return;
+      }
+  
+      // ✅ Validar puerto (número entero entre 0 y 65535)
+      if (port === '') {
+        port = '80';
+      }
+  
+      if (!/^\d+$/.test(port)) {
+        setMessage('El puerto debe contener solo números');
+        return;
+      }
+  
+      const portNumber = parseInt(port, 10);
+  
+      if (portNumber < 0 || portNumber > 65535) {
+        setMessage('El puerto debe estar entre 0 y 65535');
+        return;
+      }
+  
       const updatedDevice = {
         ...deviceToEdit,
-        port: deviceToEdit.port?.toString().trim() === '' ? '80' : deviceToEdit.port,
+        ip,
+        port: portNumber,
       };
-
+  
       await axios.put(`http://localhost:3001/devices/${deviceToEdit._id}`, updatedDevice);
+  
       setMessage('Dispositivo actualizado exitosamente');
-      fetchDevices(); // Vuelve a cargar los dispositivos
-      setEditModalOpen(false); // Cierra el modal
+      fetchDevices();
+      setEditModalOpen(false);
     } catch (err) {
       console.error('Error al actualizar dispositivo:', err);
-      setMessage('Error al actualizar dispositivo');
+      if (err.response?.data?.error) {
+        setMessage(`Error: ${err.response.data.error}`);
+      } else {
+        setMessage('Error al actualizar dispositivo');
+      }
+    } finally {
+      setLoading(false);
     }
   };
-
+  
+  
+  
+  
 
   const addDevice = async () => {
     if (!nameInput) {
       setMessage('Define un nombre para el dispositivo');
       return;
     }
-    if (!isValidIP(ipInput)) {
-      setMessage('IP no válida');
+  
+    const ip = ipInput?.trim();
+    const port = portInput?.toString().trim() || '80';
+  
+    // ✅ Validar IP con formato IPv4
+    const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/;
+    if (!ipv4Regex.test(ip)) {
+      setMessage('La dirección IP no es válida. Debe tener el formato IPv4, por ejemplo: 192.168.1.1');
       return;
     }
-
-    // Verifica si la combinación IP y puerto ya existe
-    const existingDevice = devices.find(device => device.ip === ipInput && device.port === portInput);
+  
+    // ✅ Validar que el puerto contenga solo números
+    if (!/^\d+$/.test(port)) {
+      setMessage('El puerto debe contener solo números');
+      return;
+    }
+  
+    const portNumber = parseInt(port, 10);
+    if (portNumber < 0 || portNumber > 65535) {
+      setMessage('El puerto debe estar entre 0 y 65535');
+      return;
+    }
+  
+    // 🚫 Verificar si ya existe el dispositivo
+    const existingDevice = devices.find(device => device.ip === ip && device.port === portNumber);
     if (existingDevice) {
       setMessage('Ya existe un dispositivo con esta IP y puerto');
       return;
     }
-
+  
     try {
+      setLoading(true);
       await axios.post('http://localhost:3001/devices', {
-        ip: ipInput,
-        port: portInput || '80',
+        ip,
+        port: portNumber,
         name: nameInput,
         type: typeInput,
         parent: parentInput || null,
       });
+  
+      // Resetear inputs
       setIpInput('');
       setPortInput('');
       setNameInput('');
@@ -149,52 +210,30 @@ function App() {
     } catch (error) {
       console.error('Error al agregar dispositivo:', error);
       setMessage('Error al agregar dispositivo');
-    }
-  };
-
-  const deleteDevice = async (_id) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este dispositivo?')) {
-      try {
-        await axios.delete(`http://localhost:3001/devices/${_id}`);
-        fetchDevices();
-      } catch (err) {
-        console.error('Error deleting device:', err);
-        setMessage('Error al eliminar dispositivo');
-      }
-    }
-  };
-
-  const pingAll = async (ips) => {
-    setLoading(true);
-    try {
-      // Validar que ips sea un array de cadenas
-      if (!Array.isArray(ips)) {
-        throw new Error('ips debe ser un array');
-      }
-
-      // Hacer la solicitud al servidor
-      const res = await axios.post('http://localhost:3001/ping', { devices: ips });
-
-      // Verificar que res.data sea un array
-      if (!Array.isArray(res.data)) {
-        throw new Error('La respuesta del servidor no es un array');
-      }
-
-      // Actualizar el estado de los dispositivos
-      setDevices((prev) =>
-        prev.map((dev) => {
-          const found = res.data.find((d) => d.ip === dev.ip);
-          return found ? { ...dev, alive: found.alive } : dev;
-        })
-      );
-    } catch (err) {
-      console.error('Error pinging devices:', err);
-      setMessage(`Error al hacer ping a los dispositivos: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
+  
 
+  const deleteDevice = async (_id) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este dispositivo?')) {
+      try {
+        const response = await axios.delete(`http://localhost:3001/devices/${_id}`);
+        setMessage(response.data.message || 'Dispositivo eliminado exitosamente');
+        fetchDevices();
+      } catch (err) {
+        console.error('Error deleting device:', err);
+        if (err.response && err.response.data && err.response.data.error) {
+          setMessage(`Error: ${err.response.data.error}`);
+        } else {
+          setMessage('Error al eliminar dispositivo');
+        }
+      }
+    }
+  };
+  
+  
   const getDeviceImage = (type) => {
     switch (type) {
       case 'router':
@@ -208,10 +247,7 @@ function App() {
     }
   };
 
-  const handleUpdateDevices = () => {
-    const ips = devices.map((d) => d.ip);
-    pingAll(ips);
-  };
+
 
   const handleLoginChange = (e) => {
     const { name, value } = e.target;
@@ -409,7 +445,7 @@ function App() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchDevices();
-      const interval = setInterval(fetchDevices, 60000);
+      const interval = setInterval(fetchDevices, 30000);
       return () => clearInterval(interval);
     }
   }, [isAuthenticated]);
@@ -500,7 +536,7 @@ function App() {
                     {segment}.x
                   </button>
                 ))}
-                <button onClick={handleUpdateDevices} style={{ padding: 5, borderRadius: 4, cursor: 'pointer', backgroundColor: '#28a745', color: '#fff', border: 'none' }}>Actualizar Estado</button>
+                <button onClick={fetchDevices} style={{ padding: 5, borderRadius: 4, cursor: 'pointer', backgroundColor: '#28a745', color: '#fff', border: 'none' }}>Actualizar Estado</button>
               </div>
             </div>
 
@@ -567,6 +603,7 @@ function App() {
                 transform: 'translate(-50%, 0%)',
                 transition: 'all 0.5s ease-in-out',
                 boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)',
+                zIndex: 99999999999,
               }}
             >
               {message}
@@ -675,7 +712,7 @@ const LoadingOverlay = () => (
       width: '100%',
       height: '100%',
       backgroundColor: 'rgba(0, 0, 0, 0.47)',
-      zIndex: 9999,
+      zIndex: 999999999999999999999999999999999,
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
