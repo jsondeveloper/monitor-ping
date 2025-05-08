@@ -63,13 +63,6 @@ function App() {
     }
   }, [message]);
 
-
-  const isValidIP = (ip) => {
-    const regex =
-      /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    return regex.test(ip);
-  };
-
   const fetchDevices = async () => {
     setLoading(true);
     try {
@@ -82,6 +75,25 @@ function App() {
       setLoading(false);
     }
   };
+
+  const pingAllDevices = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.post('http://localhost:3001/devices/ping-all');
+      setMessage(response.data.message || 'Ping completado');
+      fetchDevices(); // Recarga la tabla con los estados actualizados
+    } catch (err) {
+      console.error('Error al hacer ping a todos los dispositivos:', err);
+      if (err.response && err.response.data && err.response.data.error) {
+        setMessage(`Error: ${err.response.data.error}`);
+      } else {
+        setMessage('Error al hacer ping a los dispositivos');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const openEditModal = (device) => {
     setDeviceToEdit(device); // Primero, asignas el dispositivo que se va a editar
@@ -98,43 +110,43 @@ function App() {
 
   const handleUpdateDevice = async () => {
     setLoading(true);
-  
+
     try {
       let port = deviceToEdit.port?.toString().trim();
       let ip = deviceToEdit.ip?.toString().trim();
-  
+
       // ✅ Validar IP (solo números y puntos, formato básico IPv4)
       const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/;
       if (!ipv4Regex.test(ip)) {
         setMessage('La dirección IP no es válida. Debe tener el formato IPv4, por ejemplo: 192.168.1.1');
         return;
       }
-  
+
       // ✅ Validar puerto (número entero entre 0 y 65535)
       if (port === '') {
         port = '80';
       }
-  
+
       if (!/^\d+$/.test(port)) {
         setMessage('El puerto debe contener solo números');
         return;
       }
-  
+
       const portNumber = parseInt(port, 10);
-  
+
       if (portNumber < 0 || portNumber > 65535) {
         setMessage('El puerto debe estar entre 0 y 65535');
         return;
       }
-  
+
       const updatedDevice = {
         ...deviceToEdit,
         ip,
         port: portNumber,
       };
-  
+
       await axios.put(`http://localhost:3001/devices/${deviceToEdit._id}`, updatedDevice);
-  
+
       setMessage('Dispositivo actualizado exitosamente');
       fetchDevices();
       setEditModalOpen(false);
@@ -149,46 +161,46 @@ function App() {
       setLoading(false);
     }
   };
-  
-  
-  
-  
+
+
+
+
 
   const addDevice = async () => {
     if (!nameInput) {
       setMessage('Define un nombre para el dispositivo');
       return;
     }
-  
+
     const ip = ipInput?.trim();
     const port = portInput?.toString().trim() || '80';
-  
+
     // ✅ Validar IP con formato IPv4
     const ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/;
     if (!ipv4Regex.test(ip)) {
       setMessage('La dirección IP no es válida. Debe tener el formato IPv4, por ejemplo: 192.168.1.1');
       return;
     }
-  
+
     // ✅ Validar que el puerto contenga solo números
     if (!/^\d+$/.test(port)) {
       setMessage('El puerto debe contener solo números');
       return;
     }
-  
+
     const portNumber = parseInt(port, 10);
     if (portNumber < 0 || portNumber > 65535) {
       setMessage('El puerto debe estar entre 0 y 65535');
       return;
     }
-  
+
     // 🚫 Verificar si ya existe el dispositivo
     const existingDevice = devices.find(device => device.ip === ip && device.port === portNumber);
     if (existingDevice) {
       setMessage('Ya existe un dispositivo con esta IP y puerto');
       return;
     }
-  
+
     try {
       setLoading(true);
       await axios.post('http://localhost:3001/devices', {
@@ -198,7 +210,7 @@ function App() {
         type: typeInput,
         parent: parentInput || null,
       });
-  
+
       // Resetear inputs
       setIpInput('');
       setPortInput('');
@@ -214,7 +226,7 @@ function App() {
       setLoading(false);
     }
   };
-  
+
 
   const deleteDevice = async (_id) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este dispositivo?')) {
@@ -232,8 +244,8 @@ function App() {
       }
     }
   };
-  
-  
+
+
   const getDeviceImage = (type) => {
     switch (type) {
       case 'router':
@@ -512,7 +524,7 @@ function App() {
                     borderRadius: '4px',
                     backgroundColor: activeTab === '' ? '#007bff' : '#f8f9fa',
                     color: activeTab === '' ? '#fff' : '#495057',
-                    border: '1px solid #ced4da',
+                    border: 'none',
                     cursor: 'pointer',
                     fontWeight: activeTab === '' ? 'bold' : 'normal',
                   }}
@@ -528,15 +540,28 @@ function App() {
                       borderRadius: '4px',
                       backgroundColor: activeTab === segment ? '#007bff' : '#f8f9fa',
                       color: activeTab === segment ? '#fff' : '#495057',
-                      border: '1px solid #ced4da',
                       cursor: 'pointer',
+                      border: 'none',
                       fontWeight: activeTab === segment ? 'bold' : 'normal',
                     }}
                   >
                     {segment}.x
                   </button>
                 ))}
-                <button onClick={fetchDevices} style={{ padding: 5, borderRadius: 4, cursor: 'pointer', backgroundColor: '#28a745', color: '#fff', border: 'none' }}>Actualizar Estado</button>
+                 <button
+                   onClick={() => pingAllDevices(activeTab)}
+                  disabled={loading}
+                  style={{
+                    backgroundColor: loading ? '#ccc' : '#28a745', // gris si está cargando, azul si no
+                    color: loading ? '#000' : '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    width: '9em',
+                  }}
+                >
+                  {loading ? 'Actualizando...' : 'Actualizar Estado'}
+                </button>
               </div>
             </div>
 
@@ -597,7 +622,7 @@ function App() {
                 top: 0,
                 left: '50%',
                 fontSize: '1.5rem',
-                backgroundColor: message.includes('Bienvenido') || message.includes('exitosamente') || message.includes('exitoso') ? '#38a169' : '#e53e3e',
+                backgroundColor: message.includes('Bienvenido') || message.includes('exitosamente') || message.includes('actualizado') || message.includes('exitoso') ? '#38a169' : '#e53e3e',
                 opacity: message ? 1 : 0,
                 transform: message ? 'translateY(0)' : 'translateY(0)',
                 transform: 'translate(-50%, 0%)',

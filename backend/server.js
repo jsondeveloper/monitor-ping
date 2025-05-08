@@ -150,7 +150,7 @@ app.post('/devices', async (req, res) => {
     }
 
     // 🟡 Hacer ping antes de guardar
-    const pingResult = await pingDevice(ip, port);
+    //const pingResult = await pingDevice(ip, port);
 
     const device = new Device({
       ip,
@@ -158,8 +158,9 @@ app.post('/devices', async (req, res) => {
       type,
       port,
       parent: parent || null,
-      alive: pingResult.alive,
-      method: pingResult.method,
+     // alive: pingResult.alive,
+     // method: pingResult.method,
+      alive: null,
     });
 
     await device.save();
@@ -216,11 +217,11 @@ app.put('/devices/:id', async (req, res) => {
     }
 
     // 🟡 Hacer ping después de actualizar
-    const pingResult = await pingDevice(updated.ip, updated.port);
-
+    //const pingResult = await pingDevice(updated.ip, updated.port);
     // 🟢 Actualizar campos `alive` y `method`
-    updated.alive = pingResult.alive;
-    updated.method = pingResult.method;
+    //updated.alive = pingResult.alive;
+    //updated.method = pingResult.method;
+
     await updated.save();
 
     res.json(updated);
@@ -228,6 +229,29 @@ app.put('/devices/:id', async (req, res) => {
     res
       .status(500)
       .json({ error: 'Error al actualizar dispositivo', details: err.message });
+  }
+});
+
+app.post('/devices/ping-all', async (req, res) => {
+  try {
+    console.log(`${new Date().toLocaleString('es-ES', { hour12: false })} - Solicitud de actualización manual recibida`);
+ // 👈 Aquí el log
+
+    const devices = await Device.find();
+
+    const updatedDevices = await Promise.all(devices.map(async (device) => {
+      const pingResult = await pingDevice(device.ip, device.port);
+      device.alive = pingResult.alive;
+      device.method = pingResult.method;
+      return device.save();
+    }));
+
+    console.log(`${new Date().toLocaleString('es-ES', { hour12: false })} - ${updatedDevices.length} dispositivos actualizados`); // 👈 Segundo log
+
+    res.json({ message: 'Estado actualizado en todos los dispositivos', updatedDevices });
+  } catch (err) {
+    console.error('Error al hacer ping a todos los dispositivos:', err);
+    res.status(500).json({ error: 'Error al hacer ping a los dispositivos', details: err.message });
   }
 });
 
@@ -301,7 +325,7 @@ const updateDevicesStatus = async () => {
     );
   }
 
-  console.log('Actualización de dispositivos completada');
+  console.log(`${new Date().toLocaleString('es-ES', { hour12: false })} - Actualización de dispositivos completada`);
 };
 
 
